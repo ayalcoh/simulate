@@ -590,19 +590,19 @@ class _AddDeviceScreenState extends State<AddDeviceScreen> {
         _foundDevices = [
           {
             'id': 'YM-T5',
-            'name': 'YM-T5',
+            'name': 'LightBox-1',
             'type': 'Controller',
             'iconData': Icons.device_hub,
           },
           {
             'id': 'YM-S3',
-            'name': 'YM-S3',
+            'name': 'Sensor-1',
             'type': 'Sensor',
             'iconData': Icons.sensors,
           },
           {
             'id': 'YM-L2',
-            'name': 'YM-L2',
+            'name': 'LED-1',
             'type': 'Light',
             'iconData': Icons.lightbulb_outline,
           },

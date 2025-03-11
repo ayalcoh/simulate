@@ -20,21 +20,21 @@ class _HomeScreenState extends State<HomeScreen> {
   final List<Map<String, dynamic>> _connectedDevices = [
     {
       'id': '1',
-      'name': 'YM-T2',
-      'type': 'controller',
+      'name': 'LightBox-1',
+      'type': 'Controller',
       'status': 'online',
       'iconData': Icons.device_hub,
     },
     {
       'id': '2',
-      'name': 'YM-S1',
+      'name': 'Sensor-1',
       'type': 'sensor',
       'status': 'online',
       'iconData': Icons.sensors,
     },
     {
       'id': '3',
-      'name': 'YM-L1',
+      'name': 'LED-1',
       'type': 'light',
       'status': 'offline',
       'iconData': Icons.lightbulb_outline,
@@ -120,7 +120,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text(
-                      '我的设备', // My Devices
+                      'My Devices', // My Devices
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 24,

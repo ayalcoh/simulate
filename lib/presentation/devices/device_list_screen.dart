@@ -16,7 +16,7 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
   final List<Map<String, dynamic>> _devices = [
     {
       'id': '1',
-      'name': 'YM-T2',
+      'name': 'LightBox-1',
       'type': 'Controller',
       'status': 'online',
       'room': 'Living Room',
@@ -24,7 +24,7 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
     },
     {
       'id': '2',
-      'name': 'YM-S1',
+      'name': 'Sensor-1',
       'type': 'Sensor',
       'status': 'online',
       'room': 'Bedroom',
@@ -32,7 +32,7 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
     },
     {
       'id': '3',
-      'name': 'YM-L1',
+      'name': 'LED-1',
       'type': 'Light',
       'status': 'offline',
       'room': 'Kitchen',
@@ -40,7 +40,7 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
     },
     {
       'id': '4',
-      'name': 'YM-T3',
+      'name': 'Thermostat-1',
       'type': 'Thermostat',
       'status': 'online',
       'room': 'Living Room',
@@ -48,7 +48,7 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
     },
     {
       'id': '5',
-      'name': 'YM-C1',
+      'name': 'Camera-1',
       'type': 'Camera',
       'status': 'offline',
       'room': 'Front Door',
