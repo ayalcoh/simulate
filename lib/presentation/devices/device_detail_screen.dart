@@ -95,18 +95,24 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Determine if this is an LED managed by a controller
+    final bool isLED = _device.type == 'Light';
+
     return Scaffold(
       appBar: AppBar(
         title: Text(_device.name),
         centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () {
-              _showSettingsModal();
-            },
-          ),
-        ],
+        // For LEDs, don't show settings that can modify behavior directly
+        actions: isLED
+            ? []
+            : [
+                IconButton(
+                  icon: const Icon(Icons.settings),
+                  onPressed: () {
+                    _showSettingsModal();
+                  },
+                ),
+              ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -115,13 +121,17 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Hero section with device icon
-                  _buildDeviceHeader(),
+                  _buildDeviceHeader(isLED),
 
                   // Information section
                   _buildInfoSection(),
 
-                  // Controls section - Only show if device is online
-                  if (_device.isOnline) _buildControlsSection(),
+                  // For LEDs, show status but no direct controls
+                  if (isLED)
+                    _buildLEDStatusSection()
+                  // For controllers, show normal controls section
+                  else if (_device.isOnline)
+                    _buildControlsSection(),
 
                   // History section
                   _buildHistorySection(),
@@ -131,11 +141,8 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
     );
   }
 
-  // Build the device header with icon and basic controls
-  Widget _buildDeviceHeader() {
-    // Find the power property for the main toggle
-    final hasPower = _device.tsl.properties.any((p) => p.identifier == 'power');
-
+// Create a header without power controls for LEDs
+  Widget _buildDeviceHeader(bool isLED) {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
@@ -192,8 +199,9 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          // Power toggle (if available)
-          if (hasPower)
+          // Only show power toggle for non-LED devices
+          if (!isLED &&
+              _device.tsl.properties.any((p) => p.identifier == 'power'))
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -218,6 +226,87 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
         ],
       ),
     );
+  }
+
+// New widget to show LED status instead of controls
+  Widget _buildLEDStatusSection() {
+    // Get relevant properties for display
+    final brightness = _device.getProperty('brightness');
+    final color = _device.getProperty('color');
+
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Card(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Current Status',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // Show brightness as info, not as control
+              ListTile(
+                leading: const Icon(Icons.brightness_6),
+                title: const Text('Brightness'),
+                subtitle: brightness != null
+                    ? Text('${brightness.toString()}%')
+                    : const Text('Unknown'),
+              ),
+
+              // Show color as info
+              if (color != null)
+                ListTile(
+                  leading: const Icon(Icons.palette),
+                  title: const Text('Color'),
+                  subtitle: Text(color.toString()),
+                  trailing: Container(
+                    width: 24,
+                    height: 24,
+                    decoration: BoxDecoration(
+                      color: _getColorFromHex(color.toString()),
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.grey),
+                    ),
+                  ),
+                ),
+
+              // Add a note about control
+              const Padding(
+                padding: EdgeInsets.all(16),
+                child: Text(
+                  'This LED is controlled by the Lightbox controller. '
+                  'To change settings, please use the controller interface.',
+                  style: TextStyle(
+                    fontStyle: FontStyle.italic,
+                    color: Colors.grey,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+// Helper to convert hex to color
+  Color _getColorFromHex(String hexColor) {
+    hexColor = hexColor.replaceAll('#', '');
+    if (hexColor.length == 6) {
+      hexColor = 'FF' + hexColor;
+    }
+    return Color(int.parse(hexColor, radix: 16));
   }
 
   // Build information section with device details
@@ -253,7 +342,7 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
     );
   }
 
-  // Build controls section with dynamic TSL-based controls
+// Build controls section with dynamic TSL-based controls
   Widget _buildControlsSection() {
     // Get all properties except 'power' which is handled in the header
     final controlProperties =
@@ -264,68 +353,166 @@ class _DeviceDetailScreenState extends State<DeviceDetailScreen> {
       return Container();
     }
 
+    // Special handling for Controller devices
     if (_device.type == 'Controller') {
       // First find the active scenario property
       final hasScenarioLibrary = _device.tsl.properties.any((p) =>
           p.identifier == 'active_scenario' &&
           p.specs?.containsKey('has_library') == true);
 
-      if (hasScenarioLibrary) {
-        // Get the current active scenario
-        final activeScenario = _device.getProperty('active_scenario') ?? 'None';
+      return Padding(
+        padding: const EdgeInsets.all(16),
+        child: Card(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Controls',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 16),
 
-// Format the display value to handle custom scenarios
-        String displayScenario = activeScenario.toString();
-        if (displayScenario.startsWith('Custom: ')) {
-          // Extract just the name part for custom scenarios
-          displayScenario =
-              displayScenario.substring(8); // Remove 'Custom: ' prefix
-        }
+                // Add this new section to indicate control of LEDs
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 16),
+                  child: Row(
+                    children: [
+                      Icon(Icons.lightbulb_outline, color: Colors.grey),
+                      SizedBox(width: 8),
+                      Text(
+                        'Controls All Connected LEDs',
+                        style: TextStyle(
+                          color: Colors.grey,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Show the current scenario
-            ListTile(
-              leading: const Icon(Icons.theater_comedy),
-              title: const Text('Active Scenario'),
-              subtitle: Text(displayScenario),
-              trailing: ElevatedButton(
-                onPressed: () async {
-                  final result = await Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) =>
-                          ScenarioLibraryScreen(device: _device),
-                    ),
-                  );
+                // If it has scenario capabilities, show that
+                if (hasScenarioLibrary) ...[
+                  // Get the current active scenario
+                  (() {
+                    final activeScenario =
+                        _device.getProperty('active_scenario') ?? 'None';
 
-                  // Refresh the page if we got a result back
-                  if (result == true) {
-                    setState(() {});
-                  }
-                },
-                child: const Text('Browse Library'),
-              ),
+                    String displayScenario = activeScenario.toString();
+                    if (displayScenario.startsWith('Custom: ')) {
+                      // Extract just the name part for custom scenarios
+                      displayScenario = displayScenario
+                          .substring(8); // Remove 'Custom: ' prefix
+                    }
+
+                    return ListTile(
+                      leading: const Icon(Icons.theater_comedy),
+                      title: const Text('Active Scenario'),
+                      subtitle: Text(displayScenario),
+                      trailing: ElevatedButton(
+                        onPressed: () async {
+                          final result = await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) =>
+                                  ScenarioLibraryScreen(device: _device),
+                            ),
+                          );
+
+                          // Refresh the page if we got a result back
+                          if (result == true) {
+                            setState(() {});
+                          }
+                        },
+                        child: const Text('Browse Library'),
+                      ),
+                    );
+                  }()),
+
+                  const Divider(),
+                ],
+
+                // Show other controls
+                ...controlProperties
+                    .where((p) => p.identifier != 'active_scenario')
+                    .map((property) => DevicePropertyControl(
+                          device: _device,
+                          property: property,
+                          onPropertyChanged: _handlePropertyChange,
+                        ))
+                    .toList(),
+              ],
             ),
-
-            const Divider(),
-
-            // Show other controls as well
-            // (you'd have to iterate through the remaining properties)
-            ...controlProperties
-                .where((p) => p.identifier != 'active_scenario')
-                .map((property) => DevicePropertyControl(
-                      device: _device,
-                      property: property,
-                      onPropertyChanged: _handlePropertyChange,
-                    ))
-                .toList(),
-          ],
-        );
-      }
+          ),
+        ),
+      );
     }
 
+    // Special handling for LED devices - show that they're controlled by the Lightbox
+    if (_device.type == 'Light') {
+      return Padding(
+        padding: const EdgeInsets.all(16),
+        child: Card(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Status',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Message explaining these are controlled by the Lightbox
+                const Padding(
+                  padding: EdgeInsets.only(bottom: 16),
+                  child: Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Colors.grey),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'This LED is controlled by the Lightbox controller',
+                          style: TextStyle(
+                            color: Colors.grey,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Show read-only status of properties
+                ...controlProperties
+                    .map((property) => DevicePropertyControl(
+                          device: _device,
+                          property: property,
+                          onPropertyChanged: _handlePropertyChange,
+                        ))
+                    .toList(),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Default handling for other device types
     return Padding(
       padding: const EdgeInsets.all(16),
       child: Card(

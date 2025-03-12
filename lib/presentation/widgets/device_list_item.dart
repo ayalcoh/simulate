@@ -220,7 +220,17 @@ class _DeviceListItemState extends State<DeviceListItem> {
   Widget _buildQuickControl(
       Device device, bool hasPower, bool hasBrightness, bool hasTemperature) {
     // If device has power, show power toggle
-    if (hasPower) {
+    // If this is an LED device, don't show a power toggle
+    if (device.type == 'Light') {
+      // Instead of a toggle, show an info indicator or chevron
+      return Icon(
+        Icons.chevron_right,
+        color: Colors.grey[400],
+      );
+    }
+
+    // For the Lightbox controller, keep the power toggle
+    if (device.type == 'Controller' && hasPower) {
       return Switch(
         value: device.getProperty('power') == true,
         onChanged: (value) async {
