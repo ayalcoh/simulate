@@ -1,6 +1,7 @@
 // lib/config/routes.dart
 
 import 'package:flutter/material.dart';
+import 'package:smart_device_manager/data/models/device.dart'; // Add this import
 import 'package:smart_device_manager/presentation/auth/login_screen.dart';
 import 'package:smart_device_manager/presentation/auth/splash_screen.dart';
 import 'package:smart_device_manager/presentation/devices/add_device_screen.dart';
@@ -34,18 +35,36 @@ class AppRoutes {
         return MaterialPageRoute(builder: (_) => const HomeScreen());
 
       case deviceList:
-        return MaterialPageRoute(builder: (_) => const DeviceListScreen());
+        // For now, we'll create an empty list of devices
+        // In a real app, you'd pass the actual devices list
+        return MaterialPageRoute(
+          builder: (_) => DeviceListScreen(devices: []),
+        );
 
       case addDevice:
         return MaterialPageRoute(builder: (_) => const AddDeviceScreen());
 
       case deviceDetail:
-        // Cast arguments to the expected type and pass to the screen
-        if (args is Map<String, dynamic>) {
+        // Check if args is a Device
+        if (args is Device) {
           return MaterialPageRoute(
             builder: (_) => DeviceDetailScreen(device: args),
           );
         }
+
+        // Handle legacy code that might still pass a Map
+        else if (args is Map<String, dynamic>) {
+          // Convert the map to a Device object
+          try {
+            final device = _convertMapToDevice(args);
+            return MaterialPageRoute(
+              builder: (_) => DeviceDetailScreen(device: device),
+            );
+          } catch (e) {
+            return _errorRoute('Invalid device data: $e');
+          }
+        }
+
         // Fallback for incorrect arguments
         return _errorRoute('Invalid device data');
 
@@ -53,6 +72,27 @@ class AppRoutes {
       default:
         return _errorRoute('Route not found: ${settings.name}');
     }
+  }
+
+  // Helper method to convert a Map to a Device object
+  static Device _convertMapToDevice(Map<String, dynamic> map) {
+    // Extract the required fields
+    final id = map['id'] as String? ?? '';
+    final name = map['name'] as String? ?? 'Unknown Device';
+    final type = map['type'] as String? ?? 'Unknown';
+    final room = map['room'] as String? ?? 'Unknown';
+    final iconData = map['iconData'] as IconData? ?? Icons.device_unknown;
+    final status = map['status'] as String? ?? 'offline';
+
+    // Create and return a new Device
+    return Device(
+      id: id,
+      name: name,
+      type: type,
+      room: room,
+      iconData: iconData,
+      status: status,
+    );
   }
 
   // Helper method to create an error route
@@ -85,8 +125,7 @@ class AppRoutes {
     Navigator.of(context).pushReplacementNamed(login);
   }
 
-  static void navigateToDeviceDetail(
-      BuildContext context, Map<String, dynamic> device) {
+  static void navigateToDeviceDetail(BuildContext context, Device device) {
     Navigator.of(context).pushNamed(deviceDetail, arguments: device);
   }
 

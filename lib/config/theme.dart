@@ -1,10 +1,12 @@
+// lib/config/theme.dart
+
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  // Primary colors from the reference image
-  static const Color primaryColor = Color(0xFFFF5722); // Deep Orange
-  static const Color secondaryColor = Color(0xFFFF8A65); // Light Orange
-  static const Color accentColor = Color(0xFFFF3D00); // Bright Orange
+  // Updated green color palette
+  static const Color primaryColor = Color(0xFF2E7D32); // Dark Green
+  static const Color secondaryColor = Color(0xFF66BB6A); // Light Green
+  static const Color accentColor = Color(0xFF00C853); // Bright Green
 
   // Background gradient for screens like splash and login
   static const LinearGradient primaryGradient = LinearGradient(

@@ -2,74 +2,75 @@
 
 import 'package:flutter/material.dart';
 import 'package:smart_device_manager/config/theme.dart';
-import 'package:smart_device_manager/presentation/devices/device_detail_screen.dart';
+import 'package:smart_device_manager/data/models/device.dart';
+import 'package:smart_device_manager/presentation/widgets/device_list_item.dart';
 
 class DeviceListScreen extends StatefulWidget {
-  const DeviceListScreen({Key? key}) : super(key: key);
+  final List<Device> devices;
+
+  const DeviceListScreen({
+    Key? key,
+    required this.devices,
+  }) : super(key: key);
 
   @override
   State<DeviceListScreen> createState() => _DeviceListScreenState();
 }
 
 class _DeviceListScreenState extends State<DeviceListScreen> {
-  // Mock data for connected devices - in a real app, this would come from your repository
-  final List<Map<String, dynamic>> _devices = [
-    {
-      'id': '1',
-      'name': 'LightBox-1',
-      'type': 'Controller',
-      'status': 'online',
-      'room': 'Living Room',
-      'iconData': Icons.device_hub,
-    },
-    {
-      'id': '2',
-      'name': 'Sensor-1',
-      'type': 'Sensor',
-      'status': 'online',
-      'room': 'Bedroom',
-      'iconData': Icons.sensors,
-    },
-    {
-      'id': '3',
-      'name': 'LED-1',
-      'type': 'Light',
-      'status': 'offline',
-      'room': 'Kitchen',
-      'iconData': Icons.lightbulb_outline,
-    },
-    {
-      'id': '4',
-      'name': 'Thermostat-1',
-      'type': 'Thermostat',
-      'status': 'online',
-      'room': 'Living Room',
-      'iconData': Icons.thermostat,
-    },
-    {
-      'id': '5',
-      'name': 'Camera-1',
-      'type': 'Camera',
-      'status': 'offline',
-      'room': 'Front Door',
-      'iconData': Icons.videocam,
-    },
-  ];
-
   // Filter options
   String _selectedFilter = 'All';
   final List<String> _filterOptions = ['All', 'Online', 'Offline'];
 
+  // Track searched text
+  String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  // Handle device status changes
+  void _handleDeviceStatusChanged(Device device, bool isOnline) {
+    setState(() {
+      // Find and update the device
+      final index = widget.devices.indexWhere((d) => d.id == device.id);
+      if (index >= 0) {
+        widget.devices[index].setStatus(isOnline);
+        // Also update power property if it exists
+        if (widget.devices[index].tsl.properties
+            .any((p) => p.identifier == 'power')) {
+          widget.devices[index]
+              .setProperty('power', isOnline, updateBackend: false);
+        }
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Filter devices based on selected filter
-    List<Map<String, dynamic>> filteredDevices = _devices;
+    // Filter devices based on selected filter and search query
+    List<Device> filteredDevices = widget.devices;
+
+    // Apply status filter
     if (_selectedFilter == 'Online') {
       filteredDevices =
-          _devices.where((device) => device['status'] == 'online').toList();
+          filteredDevices.where((device) => device.isOnline).toList();
     } else if (_selectedFilter == 'Offline') {
       filteredDevices =
-          _devices.where((device) => device['status'] == 'offline').toList();
+          filteredDevices.where((device) => !device.isOnline).toList();
+    }
+
+    // Apply search filter if there's a search query
+    if (_searchQuery.isNotEmpty) {
+      filteredDevices = filteredDevices.where((device) {
+        final query = _searchQuery.toLowerCase();
+        return device.name.toLowerCase().contains(query) ||
+            device.type.toLowerCase().contains(query) ||
+            device.room.toLowerCase().contains(query);
+      }).toList();
     }
 
     return Scaffold(
@@ -80,13 +81,50 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
           IconButton(
             icon: const Icon(Icons.search),
             onPressed: () {
-              // TODO: Implement search functionality
+              _showSearchDialog();
             },
           ),
         ],
       ),
       body: Column(
         children: [
+          // Search bar (if search is active)
+          if (_searchQuery.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.search, color: Colors.grey),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Search: $_searchQuery',
+                        style: TextStyle(color: Colors.grey[700]),
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.close, color: Colors.grey),
+                      onPressed: () {
+                        setState(() {
+                          _searchQuery = '';
+                          _searchController.clear();
+                        });
+                      },
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
           // Filter chips
           Padding(
             padding: const EdgeInsets.all(16.0),
@@ -163,8 +201,10 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
                     padding: const EdgeInsets.all(16),
                     itemCount: filteredDevices.length,
                     itemBuilder: (context, index) {
-                      final device = filteredDevices[index];
-                      return _buildDeviceCard(device);
+                      return DeviceListItem(
+                        device: filteredDevices[index],
+                        onDeviceStatusChanged: _handleDeviceStatusChanged,
+                      );
                     },
                   ),
           ),
@@ -173,130 +213,40 @@ class _DeviceListScreenState extends State<DeviceListScreen> {
     );
   }
 
-  Widget _buildDeviceCard(Map<String, dynamic> device) {
-    final bool isOnline = device['status'] == 'online';
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 16),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
-      elevation: 2,
-      child: InkWell(
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => DeviceDetailScreen(device: device),
+  // Show search dialog
+  void _showSearchDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Search Devices'),
+          content: TextField(
+            controller: _searchController,
+            decoration: const InputDecoration(
+              hintText: 'Enter device name, type, or room',
+              prefixIcon: Icon(Icons.search),
             ),
-          );
-        },
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Row(
-            children: [
-              // Device icon
-              Container(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(
-                  color: isOnline
-                      ? AppTheme.primaryColor.withOpacity(0.1)
-                      : Colors.grey[200],
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  device['iconData'],
-                  color: isOnline ? AppTheme.primaryColor : Colors.grey,
-                  size: 30,
-                ),
-              ),
-
-              const SizedBox(width: 16),
-
-              // Device info
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          device['name'],
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 4,
-                          ),
-                          decoration: BoxDecoration(
-                            color:
-                                isOnline ? Colors.green[50] : Colors.grey[100],
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            isOnline ? 'Online' : 'Offline',
-                            style: TextStyle(
-                              color: isOnline ? Colors.green : Colors.grey,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      device['type'],
-                      style: TextStyle(
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.room,
-                          size: 14,
-                          color: Colors.grey[600],
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          device['room'],
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-
-              // Toggle switch
-              Switch(
-                value: isOnline,
-                onChanged: (value) {
-                  // In a real app, this would connect/disconnect the device
-                  setState(() {
-                    _devices[
-                            _devices.indexWhere((d) => d['id'] == device['id'])]
-                        ['status'] = value ? 'online' : 'offline';
-                  });
-                },
-                activeColor: AppTheme.primaryColor,
-              ),
-            ],
+            autofocus: true,
           ),
-        ),
-      ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+              },
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                setState(() {
+                  _searchQuery = _searchController.text;
+                });
+                Navigator.pop(context);
+              },
+              child: const Text('Search'),
+            ),
+          ],
+        );
+      },
     );
   }
 }

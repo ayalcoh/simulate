@@ -2,8 +2,10 @@
 
 import 'package:flutter/material.dart';
 import 'package:smart_device_manager/config/theme.dart';
+import 'package:smart_device_manager/data/models/device.dart';
 import 'package:smart_device_manager/presentation/devices/add_device_screen.dart';
 import 'package:smart_device_manager/presentation/devices/device_list_screen.dart';
+import 'package:smart_device_manager/presentation/widgets/device_list_item.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -16,30 +18,99 @@ class _HomeScreenState extends State<HomeScreen> {
   // Track which tab is currently selected in the bottom navigation
   int _currentIndex = 0;
 
-  // Mock data for connected devices - in a real app, this would come from your repository
-  final List<Map<String, dynamic>> _connectedDevices = [
-    {
-      'id': '1',
-      'name': 'LightBox-1',
-      'type': 'Controller',
-      'status': 'online',
-      'iconData': Icons.device_hub,
-    },
-    {
-      'id': '2',
-      'name': 'Sensor-1',
-      'type': 'sensor',
-      'status': 'online',
-      'iconData': Icons.sensors,
-    },
-    {
-      'id': '3',
-      'name': 'LED-1',
-      'type': 'light',
-      'status': 'offline',
-      'iconData': Icons.lightbulb_outline,
-    },
-  ];
+  // Track if data is loading
+  bool _isLoading = true;
+
+  // List of devices
+  List<Device> _devices = [];
+
+  @override
+  void initState() {
+    super.initState();
+    // Load devices
+    _loadDevices();
+  }
+
+  // Load devices from backend (simulated)
+  Future<void> _loadDevices() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      // Simulate network delay
+      await Future.delayed(const Duration(seconds: 1));
+
+      // In a real app, you'd fetch this from your backend
+      _devices = [
+        Device(
+          id: '1',
+          name: 'LightBox-1',
+          type: 'Controller',
+          room: 'Living Room',
+          iconData: Icons.device_hub,
+          status: 'online',
+        ),
+        Device(
+          id: '2',
+          name: 'Sensor-1',
+          type: 'Sensor',
+          room: 'Bedroom',
+          iconData: Icons.sensors,
+          status: 'online',
+        ),
+        Device(
+          id: '3',
+          name: 'LED-1',
+          type: 'Light',
+          room: 'Kitchen',
+          iconData: Icons.lightbulb_outline,
+          status: 'offline',
+        ),
+      ];
+
+      // Set initial property values (in a real app, these would come from the backend)
+      _devices[0].setProperty('power', true, updateBackend: false);
+      _devices[0].setProperty('mode', 'Standard', updateBackend: false);
+
+      _devices[1].setProperty('active', true, updateBackend: false);
+      _devices[1].setProperty('reading', 23.5, updateBackend: false);
+
+      _devices[2].setProperty('power', false, updateBackend: false);
+      _devices[2].setProperty('brightness', 80, updateBackend: false);
+
+      setState(() {
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+
+      // Show error
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error loading devices: $e')),
+      );
+    }
+  }
+
+  // Handle device status changes
+  void _handleDeviceStatusChanged(Device device, bool isOnline) {
+    setState(() {
+      // Find and update the device
+      final index = _devices.indexWhere((d) => d.id == device.id);
+      if (index >= 0) {
+        _devices[index].setStatus(isOnline);
+        // Also update power property if it exists
+        if (_devices[index]
+            .tsl
+            .properties
+            .any((p) => p.identifier == 'power')) {
+          _devices[index].setProperty('power', isOnline, updateBackend: false);
+        }
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -61,19 +132,19 @@ class _HomeScreenState extends State<HomeScreen> {
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.home),
-            label: 'Home', // Home
+            label: 'Home',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.devices),
-            label: 'Devices', // Devices
+            label: 'Devices',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.explore),
-            label: 'Discover', // Discover
+            label: 'Discover',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person),
-            label: 'Profile', // Profile
+            label: 'Profile',
           ),
         ],
       ),
@@ -86,7 +157,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case 0:
         return _buildHomePage();
       case 1:
-        return const DeviceListScreen(); // We'll create this screen next
+        return DeviceListScreen(devices: _devices);
       case 2:
         return _buildDiscoverPage();
       case 3:
@@ -99,138 +170,143 @@ class _HomeScreenState extends State<HomeScreen> {
   // Main home page content
   Widget _buildHomePage() {
     return SafeArea(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header with gradient background
-          Container(
-            padding: const EdgeInsets.all(20),
-            decoration: const BoxDecoration(
-              gradient: AppTheme.primaryGradient,
-              borderRadius: BorderRadius.only(
-                bottomLeft: Radius.circular(30),
-                bottomRight: Radius.circular(30),
-              ),
-            ),
-            child: Column(
+      child: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Top row with title and notification icon
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'My Devices', // My Devices
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
+                // Header with gradient background
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: const BoxDecoration(
+                    gradient: AppTheme.primaryGradient,
+                    borderRadius: BorderRadius.only(
+                      bottomLeft: Radius.circular(30),
+                      bottomRight: Radius.circular(30),
                     ),
-                    CircleAvatar(
-                      backgroundColor: Colors.white.withOpacity(0.2),
-                      child: IconButton(
-                        icon: const Icon(Icons.notifications,
-                            color: Colors.white),
-                        onPressed: () {
-                          // Handle notifications
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                // Device count and add device button
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      '${_connectedDevices.length} X devices connected', // X devices connected
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                      ),
-                    ),
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.of(context).push(
-                          MaterialPageRoute(
-                            builder: (_) => const AddDeviceScreen(),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Top row with title and notification icon
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          const Text(
+                            'My Devices',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
-                        );
-                      },
-                      icon: const Icon(Icons.add),
-                      label: const Text('Add Device'), // Add Device
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: AppTheme.primaryColor,
+                          CircleAvatar(
+                            backgroundColor: Colors.white.withOpacity(0.2),
+                            child: IconButton(
+                              icon: const Icon(Icons.notifications,
+                                  color: Colors.white),
+                              onPressed: () {
+                                // Handle notifications
+                              },
+                            ),
+                          ),
+                        ],
                       ),
+                      const SizedBox(height: 20),
+                      // Device count and add device button
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            '${_devices.length} devices connected',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                            ),
+                          ),
+                          ElevatedButton.icon(
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) => const AddDeviceScreen(),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.add),
+                            label: const Text('Add Device'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              foregroundColor: AppTheme.primaryColor,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Device categories section
+                Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Device Categories',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      // Row of category icons
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          _buildCategoryItem(Icons.all_inclusive, 'All'),
+                          _buildCategoryItem(Icons.tv, 'Living Room'),
+                          _buildCategoryItem(Icons.king_bed, 'Bedroom'),
+                          _buildCategoryItem(Icons.kitchen, 'Kitchen'),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Recently connected devices list
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Recently Connected',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        // Scrollable list of device items
+                        Expanded(
+                          child: ListView.builder(
+                            itemCount: _devices.length,
+                            itemBuilder: (context, index) {
+                              return DeviceListItem(
+                                device: _devices[index],
+                                onDeviceStatusChanged:
+                                    _handleDeviceStatusChanged,
+                              );
+                            },
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
               ],
             ),
-          ),
-
-          // Device categories section
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Device Categories', // Device Categories
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                // Row of category icons
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _buildCategoryItem(Icons.all_inclusive, 'All'), // All
-                    _buildCategoryItem(Icons.tv, 'Living Room'), // Living Room
-                    _buildCategoryItem(Icons.king_bed, 'Bedroom'), // Bedroom
-                    _buildCategoryItem(Icons.kitchen, 'Kitchen'), // Kitchen
-                  ],
-                ),
-              ],
-            ),
-          ),
-
-          // Recently connected devices list
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Recently Connected', // Recently Connected
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  // Scrollable list of device items
-                  Expanded(
-                    child: ListView.builder(
-                      itemCount: _connectedDevices.length,
-                      itemBuilder: (context, index) {
-                        final device = _connectedDevices[index];
-                        return _buildDeviceItem(device);
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -261,66 +337,17 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Helper method to build each device item in the list
-  Widget _buildDeviceItem(Map<String, dynamic> device) {
-    final bool isOnline = device['status'] == 'online';
-
-    return Card(
-      elevation: 2,
-      margin: const EdgeInsets.only(bottom: 16),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(15),
-      ),
-      child: ListTile(
-        leading: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: isOnline
-                ? AppTheme.primaryColor.withOpacity(0.1)
-                : Colors.grey[200],
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Icon(
-            device['iconData'],
-            color: isOnline ? AppTheme.primaryColor : Colors.grey,
-          ),
-        ),
-        title: Text(
-          device['name'],
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        subtitle: Text(device['type']),
-        trailing: Switch(
-          value: isOnline,
-          onChanged: (value) {
-            // In a real app, this would connect/disconnect the device
-            setState(() {
-              _connectedDevices[_connectedDevices.indexOf(device)]['status'] =
-                  value ? 'online' : 'offline';
-            });
-          },
-          activeColor: AppTheme.primaryColor,
-        ),
-        onTap: () {
-          // Navigate to device detail page (we'll implement this later)
-        },
-      ),
-    );
-  }
-
   // Placeholder for Discover tab - will implement later
   Widget _buildDiscoverPage() {
     return const Center(
-      child: Text(
-          'Discover page - to be implemented'), // Discover page - to be implemented
+      child: Text('Discover page - to be implemented'),
     );
   }
 
   // Placeholder for Profile tab - will implement later
   Widget _buildProfilePage() {
     return const Center(
-      child: Text(
-          'Profile page - to be implemnted'), // Profile page - to be implemented
+      child: Text('Profile page - to be implemented'),
     );
   }
 }
